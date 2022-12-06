@@ -5,54 +5,43 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
-namespace AuthenticationAndAuthorization.Data
-{
-    public class WebsiteAuthenticator : AuthenticationStateProvider
-    {
+namespace AuthenticationAndAuthorization.Data {
+    public class WebsiteAuthenticator : AuthenticationStateProvider {
         private readonly ProtectedLocalStorage _protectedLocalStorage;
         private readonly SimulatedDataProviderService _dataProviderService;
 
-        public WebsiteAuthenticator(ProtectedLocalStorage protectedLocalStorage, SimulatedDataProviderService dataProviderService)
-        {
+        public WebsiteAuthenticator(ProtectedLocalStorage protectedLocalStorage, SimulatedDataProviderService dataProviderService) {
             _protectedLocalStorage = protectedLocalStorage;
             _dataProviderService = dataProviderService;
         }
 
-        public override async Task<AuthenticationState> GetAuthenticationStateAsync()
-        {
+        public override async Task<AuthenticationState> GetAuthenticationStateAsync() {
             var principal = new ClaimsPrincipal();
 
-            try
-            {
+            try {
                 var storedPrincipal = await _protectedLocalStorage.GetAsync<string>("identity");
 
-                if (storedPrincipal.Success)
-                {
+                if (storedPrincipal.Success) {
                     var user = JsonConvert.DeserializeObject<User>(storedPrincipal.Value);
                     var (userInDb, isLookUpSuccess) = LookUpUser(user.Username, user.Password);
 
-                    if (isLookUpSuccess)
-                    {
+                    if (isLookUpSuccess) {
                         var identity = CreateIdentityFromUser(userInDb);
                         principal = new(identity);
                     }
                 }
-            }
-            catch
-            {
+            } catch {
 
             }
 
             return new AuthenticationState(principal);
         }
 
-        public async Task LoginAsync(LoginFormModel loginFormModel)
-        {
+        public async Task LoginAsync(LoginFormModel loginFormModel) {
             var (userInDatabase, isSuccess) = LookUpUser(loginFormModel.Username, loginFormModel.Password);
             var principal = new ClaimsPrincipal();
 
-            if (isSuccess)
-            {
+            if (isSuccess) {
                 var identity = CreateIdentityFromUser(userInDatabase);
                 principal = new ClaimsPrincipal(identity);
                 await _protectedLocalStorage.SetAsync("identity", JsonConvert.SerializeObject(userInDatabase));
@@ -61,15 +50,13 @@ namespace AuthenticationAndAuthorization.Data
             NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(principal)));
         }
 
-        public async Task LogoutAsync()
-        {
+        public async Task LogoutAsync() {
             await _protectedLocalStorage.DeleteAsync("identity");
             var principal = new ClaimsPrincipal();
             NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(principal)));
         }
 
-        private ClaimsIdentity CreateIdentityFromUser(User user)
-        {
+        private ClaimsIdentity CreateIdentityFromUser(User user) {
             var result = new ClaimsIdentity(new Claim[]
             {
                 new (ClaimTypes.Name, user.Username),
@@ -80,16 +67,14 @@ namespace AuthenticationAndAuthorization.Data
 
             var roles = _dataProviderService.GetUserRoles(user);
 
-            foreach (string role in roles)
-            {
+            foreach (string role in roles) {
                 result.AddClaim(new(ClaimTypes.Role, role));
             }
 
             return result;
         }
 
-        private (User, bool) LookUpUser(string username, string password)
-        {
+        private (User, bool) LookUpUser(string username, string password) {
             var result = _dataProviderService.Users.FirstOrDefault(u => username == u.Username && password == u.Password);
 
             return (result, result is not null);
